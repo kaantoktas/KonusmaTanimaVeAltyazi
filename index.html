@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Video Altyazı Oluşturucu</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script
+      crossorigin
+      src="https://unpkg.com/react@18/umd/react.development.js"
+    ></script>
+    <script
+      crossorigin
+      src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"
+    ></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+      body {
+        font-family: "Inter", sans-serif;
+      }
+      .rounded-xl {
+        border-radius: 0.75rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="text/babel">
+      const App = () => {
+        const [selectedVideo, setSelectedVideo] = React.useState(null);
+        const [uploading, setUploading] = React.useState(false);
+        const [processingMessage, setProcessingMessage] = React.useState("");
+        const [processedSubtitles, setProcessedSubtitles] = React.useState([]);
+        const [speakerColors, setSpeakerColors] = React.useState({});
+        const [processedVideoUrl, setProcessedVideoUrl] = React.useState(null);
+        const availableColors = [
+          "text-blue-600",
+          "text-green-600",
+          "text-purple-600",
+          "text-red-600",
+          "text-yellow-600",
+          "text-indigo-600",
+          "text-pink-600",
+          "text-teal-600",
+        ];
+
+        const getSpeakerColor = (speakerId) => {
+          if (!speakerColors[speakerId]) {
+            const newColorIndex =
+              Object.keys(speakerColors).length % availableColors.length;
+            setSpeakerColors((prevColors) => ({
+              ...prevColors,
+              [speakerId]: availableColors[newColorIndex],
+            }));
+            return availableColors[newColorIndex];
+          }
+          return speakerColors[speakerId];
+        };
+
+        const handleVideoChange = (event) => {
+          const file = event.target.files[0];
+          if (file && file.type.startsWith("video/")) {
+            setSelectedVideo(file);
+            setProcessingMessage("");
+            setProcessedSubtitles([]);
+            setSpeakerColors({});
+            setProcessedVideoUrl(null);
+          } else {
+            setSelectedVideo(null);
+            setProcessingMessage(
+              "Lütfen geçerli bir video dosyası (.mp4, .mov, vb.) seçin."
+            );
+          }
+        };
+
+        const handleProcessVideo = async () => {
+          if (!selectedVideo) {
+            setProcessingMessage("Lütfen önce bir video dosyası seçin.");
+            return;
+          }
+
+          setUploading(true);
+          setProcessingMessage(
+            "Video yükleniyor ve işleniyor... Bu işlem video boyutuna ve konuşma süresine göre zaman alabilir."
+          );
+          setProcessedSubtitles([]);
+          setProcessedVideoUrl(null);
+
+          const formData = new FormData();
+          formData.append("video", selectedVideo);
+
+          try {
+            const response = await fetch(
+              "http://127.0.0.1:5000/process-video",
+              {
+                method: "POST",
+                body: formData,
+              }
+            );
+
+            if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(
+                errorData.error || "Video işlenirken bir hata oluştu."
+              );
+            }
+
+            const data = await response.json();
+
+            if (data.subtitles && data.subtitles.length > 0) {
+              const subtitlesWithColors = data.subtitles.map((sub) => ({
+                ...sub,
+                color: getSpeakerColor(sub.speaker),
+              }));
+              setProcessedSubtitles(subtitlesWithColors);
+              setProcessingMessage(
+                "Video başarıyla işlendi ve altyazılar oluşturuldu!"
+              );
+            } else {
+              setProcessingMessage(
+                "Video işlendi ancak altyazı bulunamadı veya konuşma algılanamadı."
+              );
+            }
+
+            if (data.processedVideoUrl) {
+              setProcessedVideoUrl(data.processedVideoUrl);
+              setProcessingMessage(
+                (prev) =>
+                  prev +
+                  "\nİşlenmiş videoyu indirmek için aşağıdaki bağlantıyı kullanın."
+              );
+            } else {
+              if (!data.subtitles || data.subtitles.length === 0) {
+                setProcessingMessage(
+                  "Video işlendi ancak altyazı bulunamadı veya konuşma algılanamadı."
+                );
+              } else {
+                setProcessingMessage(
+                  "Video başarıyla işlendi ve altyazılar oluşturuldu. Ancak işlenmiş video URL'i dönmedi."
+                );
+              }
+            }
+          } catch (error) {
+            console.error("Video işlenirken hata oluştu:", error);
+            setProcessingMessage(
+              `Video işlenirken bir hata oluştu: ${error.message}. Lütfen tarayıcı konsolunu ve arka uç terminalini kontrol edin.`
+            );
+            setProcessedSubtitles([]);
+            setProcessedVideoUrl(null);
+          } finally {
+            setUploading(false);
+          }
+        };
+
+        return (
+          <div className="min-h-screen bg-gradient-to-br from-indigo-100 to-purple-100 p-4 sm:p-8 flex items-center justify-center font-inter antialiased">
+            <div className="bg-white p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-4xl transform transition-all duration-300 hover:shadow-3xl">
+              <h1 className="text-3xl sm:text-4xl font-bold text-center text-gray-800 mb-6 sm:mb-8">
+                Video Konuşma Tanıma & Altyazı Oluşturucu
+              </h1>
+              <p className="text-center text-gray-600 mb-6 max-w-2xl mx-auto text-sm sm:text-base">
+                Videoyu yükleyerek içindeki konuşmaları tanıyıp, kişilere özel
+                renkli altyazılar oluşturun.
+              </p>
+
+              <div className="mb-6 sm:mb-8 p-4 border border-gray-300 rounded-lg bg-gray-50">
+                <label
+                  htmlFor="videoUpload"
+                  className="block text-gray-700 text-lg font-semibold mb-3"
+                >
+                  Video Yükle
+                </label>
+                <input
+                  type="file"
+                  id="videoUpload"
+                  accept="video/*"
+                  onChange={handleVideoChange}
+                  className="w-full text-gray-800 file:mr-4 file:py-2 file:px-4
+                                           file:rounded-lg file:border-0 file:text-sm file:font-semibold
+                                           file:bg-purple-50 file:text-purple-700
+                                           hover:file:bg-purple-100 cursor-pointer transition-all duration-200"
+                />
+                {selectedVideo && (
+                  <p className="mt-3 text-sm text-gray-600">
+                    Seçilen video:{" "}
+                    <span className="font-medium text-purple-700">
+                      {selectedVideo.name}
+                    </span>
+                  </p>
+                )}
+              </div>
+
+              <div className="flex justify-center mb-6 sm:mb-8">
+                <button
+                  onClick={handleProcessVideo}
+                  disabled={!selectedVideo || uploading}
+                  className={`w-full max-w-xs bg-purple-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg
+                                            ${
+                                              !selectedVideo || uploading
+                                                ? "opacity-50 cursor-not-allowed"
+                                                : "hover:bg-purple-700 transition-transform transform hover:scale-105"
+                                            }
+                                            focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-opacity-75`}
+                >
+                  {uploading ? "İşleniyor..." : "Videoyu İşle"}
+                </button>
+              </div>
+
+              {processingMessage && (
+                <p className="text-center text-purple-700 font-medium mb-6 sm:mb-8 p-3 bg-purple-50 rounded-lg whitespace-pre-line">
+                  {processingMessage}
+                </p>
+              )}
+
+              {processedVideoUrl && (
+                <div className="mb-6 sm:mb-8 p-4 border border-green-300 rounded-lg bg-green-50 text-center">
+                  <p className="text-green-800 font-semibold mb-3">
+                    Altyazılı Video Hazır!
+                  </p>
+                  <a
+                    href={processedVideoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block bg-green-600 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-green-700 transition-transform transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75"
+                  >
+                    Videoyu İndir / İzle
+                  </a>
+                </div>
+              )}
+
+              <h2 className="text-2xl font-bold text-gray-800 mb-4 border-b-2 border-purple-300 pb-2">
+                Oluşturulan Metin Altyazılar
+              </h2>
+              <div className="bg-gray-50 p-6 rounded-lg border border-gray-200 min-h-[150px] max-h-[400px] overflow-y-auto">
+                {processedSubtitles.length > 0 ? (
+                  processedSubtitles.map((subtitle) => (
+                    <p
+                      key={subtitle.id}
+                      className={`mb-2 ${subtitle.color} font-medium text-sm sm:text-base`}
+                    >
+                      <span className="font-semibold">{subtitle.speaker}:</span>{" "}
+                      {subtitle.text}
+                      <span className="text-gray-500 text-xs ml-2">
+                        [{subtitle.startTime.toFixed(1)}s -{" "}
+                        {subtitle.endTime.toFixed(1)}s]
+                      </span>
+                    </p>
+                  ))
+                ) : (
+                  <p className="text-gray-500 italic text-center py-10 text-sm sm:text-base">
+                    Video işlendikten sonra altyazılar burada görünecektir.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      const root = ReactDOM.createRoot(document.getElementById("root"));
+      root.render(React.createElement(App));
+    </script>
+  </body>
+</html>
