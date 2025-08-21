@@ -7,7 +7,7 @@ import ffmpeg
 import uuid 
 from dotenv import load_dotenv 
 import json 
-import datetime # Zaman işlemleri için
+import datetime 
 
 load_dotenv()
 
@@ -26,7 +26,7 @@ storage_client = storage.Client()
 
 @app.route('/')
 def hello_world():
-    """Basit bir test noktası."""
+    """test noktası"""
     return 'Merhaba Dunya! Arka Uç Uygulamasi Çalışıyor!'
 
 def format_srt_time(seconds):
@@ -39,11 +39,7 @@ def format_srt_time(seconds):
     return f"{hours:02d}:{minutes:02d}:{seconds:02d},{ms:03d}"
 
 def create_srt_file(subtitles_data, file_path):
-    """
-    Verilen altyazı verilerinden bir SRT dosyası oluşturur.
-    subtitles_data: [{speaker, text, startTime, endTime}]
-    file_path: Oluşturulacak SRT dosyasının tam yolu
-    """
+    
     with open(file_path, 'w', encoding='utf-8') as f:
         for i, sub in enumerate(subtitles_data):
         
@@ -67,7 +63,6 @@ def create_srt_file(subtitles_data, file_path):
 
 @app.route('/process-video', methods=['POST'])
 def process_video():
-    """Video dosyasını alır, işler ve altyazıları döndürür."""
     if 'video' not in request.files:
         return jsonify({'error': 'Video dosyası bulunamadı'}), 400
 
@@ -79,7 +74,6 @@ def process_video():
         file_id = str(uuid.uuid4())
         original_video_filename = video_file.filename
         
-        # Dosya uzantısını koru
         file_extension = os.path.splitext(original_video_filename)[1] 
         video_local_path = os.path.join(UPLOAD_FOLDER, f"{file_id}_original{file_extension}")
         audio_local_path = os.path.join(UPLOAD_FOLDER, f"{file_id}.wav")
@@ -96,7 +90,6 @@ def process_video():
             ffmpeg.input(video_local_path).output(audio_local_path, ac=1, ar=16000).run(overwrite_output=True)
             app.logger.info(f"Ses çıkarıldı ve WAV'a dönüştürüldü: {audio_local_path}")
 
-            # 2. Ses dosyasını Google Cloud Storage'a yükle
             bucket = storage_client.bucket(GCS_BUCKET_NAME)
             blob_name_audio = f"audio/{file_id}.wav"
             blob_audio = bucket.blob(blob_name_audio)
